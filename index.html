@@ -1,0 +1,226 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My Feda | Analyse BRVM</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1220;--panel:#121d2e;--line:#26364b;--text:#eef4ff;--muted:#9aabc1;--green:#35d39a;--red:#ff727c;--blue:#70a7ff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,sans-serif}
+header{padding:22px 16px;background:#101a2a;border-bottom:1px solid var(--line)}
+.brand{font-size:27px;font-weight:800;letter-spacing:-1px}
+.brand span{color:var(--green)}
+header p{color:var(--muted);font-size:13px;margin:8px 0 0}
+main{max-width:1100px;margin:auto;padding:16px}
+h2{font-size:18px;margin:0 0 14px}
+h3{font-size:15px;margin:0 0 12px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.panel,.metric{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px;margin-bottom:14px;min-width:0}
+.metric small{display:block;color:var(--muted);font-size:12px}
+.metric strong{display:block;font-size:23px;margin-top:10px;overflow-wrap:anywhere}
+.muted{color:var(--muted);font-size:13px;line-height:1.5}
+.green{color:var(--green)}.red{color:var(--red)}.blue{color:var(--blue)}
+button,.filelabel{background:var(--green);color:#07150f;border:0;border-radius:8px;padding:12px 14px;font-weight:700;cursor:pointer;display:inline-block}
+input,select{width:100%;padding:12px;background:#0b1422;color:var(--text);border:1px solid var(--line);border-radius:8px;margin:7px 0 12px}
+input[type=file]{font-size:12px}
+label{font-size:12px;color:var(--muted)}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;white-space:nowrap;font-size:12px}
+th,td{text-align:right;padding:11px 9px;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--muted);font-weight:600}
+.signal{padding:12px;border-radius:8px;background:#0b1422;line-height:1.5;font-size:13px}
+.bar{height:8px;border-radius:5px;background:#26364b;overflow:hidden;margin:10px 0}
+.bar span{display:block;height:100%;width:0;background:var(--green)}
+footer{color:var(--muted);font-size:12px;line-height:1.6;padding:8px 0 30px}
+@media(min-width:700px){.grid{grid-template-columns:repeat(4,minmax(0,1fr))}.twocol{display:grid;grid-template-columns:1fr 1fr;gap:14px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">MY <span>FEDA</span></div>
+  <p>BRVM · Analyse des actions · Accumulation & distribution</p>
+</header>
+<main>
+  <section class="panel">
+    <h2>Centre d'analyse</h2>
+    <p class="muted">Importe un historique de cotations pour calculer les indicateurs. Aucun cours fictif n'est utilisé.</p>
+    <label for="csv">Fichier CSV des cotations</label>
+    <input id="csv" type="file" accept=".csv,text/csv">
+    <p class="muted">Colonnes requises : date, symbol, open, high, low, close, volume. Les noms peuvent être en français ou en anglais. Séparateur : virgule ou point-virgule.</p>
+    <label for="symbol">Action à analyser</label>
+    <select id="symbol" disabled><option>Aucune donnée importée</option></select>
+    <button id="reset" type="button">Effacer les données</button>
+    <p id="status" class="muted" aria-live="polite">En attente d'un fichier CSV.</p>
+  </section>
+
+  <h2>Indicateurs de l'action</h2>
+  <div class="grid">
+    <div class="metric"><small>Dernier cours importé</small><strong id="price">—</strong><small id="priceDate">Date inconnue</small></div>
+    <div class="metric"><small>Variation de la séance</small><strong id="change">—</strong><small>Par rapport à la clôture précédente</small></div>
+    <div class="metric"><small>Ligne A/D</small><strong id="ad">—</strong><small>Accumulation / Distribution cumulée</small></div>
+    <div class="metric"><small>CMF · 20 séances</small><strong id="cmf">—</strong><small>Flux monétaire pondéré par les volumes</small></div>
+  </div>
+
+  <div class="twocol">
+    <section class="panel">
+      <h3>Lecture des flux</h3>
+      <div class="signal" id="flow">Importe des données pour commencer l'analyse.</div>
+      <div class="bar"><span id="flowbar"></span></div>
+      <p class="muted">Un CMF positif peut signaler une pression acheteuse ; un CMF négatif peut signaler une pression vendeuse. Ce ne sont pas des preuves d'accumulation par des investisseurs institutionnels.</p>
+    </section>
+    <section class="panel">
+      <h3>Préparation de la décision</h3>
+      <div class="signal" id="decision">Aucun signal disponible.</div>
+      <p class="muted">Les signaux techniques ne garantissent pas l'évolution future. Vérifie également la liquidité, les fondamentaux, les frais et ton niveau de risque.</p>
+    </section>
+  </div>
+
+  <section class="panel">
+    <h2>Historique importé</h2>
+    <p class="muted" id="count">0 séance analysée</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Date</th><th>Cours</th><th>Variation</th><th>Volume</th><th>Flux</th></tr></thead>
+        <tbody id="rows"><tr><td colspan="5">Aucune donnée disponible.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    Source des données : fichier importé par l'utilisateur. Vérifie la date et l'origine des cours.
+    My Feda est un outil d'analyse pédagogique, pas un conseil financier personnalisé.
+    Les données importées restent dans cette page et ne sont pas envoyées à un serveur.
+  </footer>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let marketData=[];
+const aliases={
+ date:["date","jour","seance","séance"],
+ symbol:["symbol","ticker","code","symbole","valeur","action"],
+ open:["open","ouverture","coursouverture"],
+ high:["high","haut","plushaut"],
+ low:["low","bas","plusbas"],
+ close:["close","cloture","clôture","cours","derniercours"],
+ volume:["volume","volumes","quantite","quantité","titres"]
+};
+function norm(s){return String(s||"").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[\s_-]/g,"")}
+function number(v){
+ let s=String(v??"").trim().replace(/\s/g,"");
+ if(s.includes(",")&&s.includes("."))s=s.lastIndexOf(",")>s.lastIndexOf(".")?s.replace(/\./g,"").replace(",","."):s.replace(/,/g,"");
+ else s=s.replace(",",".");
+ return Number(s);
+}
+function parseCSV(text){
+ const first=text.split(/\r?\n/).find(x=>x.trim())||"";
+ const sep=(first.match(/;/g)||[]).length>(first.match(/,/g)||[]).length?";":",";
+ const lines=text.replace(/^\uFEFF/,"").split(/\r?\n/).filter(x=>x.trim());
+ function split(line){
+  let out=[],cur="",quoted=false;
+  for(let i=0;i<line.length;i++){
+   const c=line[i];
+   if(c==='"'&&line[i+1]==='"'&&quoted){cur+='"';i++}
+   else if(c==='"')quoted=!quoted;
+   else if(c===sep&&!quoted){out.push(cur.trim());cur=""}
+   else cur+=c;
+  }
+  out.push(cur.trim());return out;
+ }
+ const headers=split(lines[0]).map(norm);
+ const indexes={};
+ for(const key in aliases)indexes[key]=headers.findIndex(h=>aliases[key].some(a=>norm(a)===h));
+ const missing=Object.keys(indexes).filter(k=>indexes[k]<0);
+ if(missing.length)throw Error("Colonnes manquantes : "+missing.join(", "));
+ const result=[];
+ for(let i=1;i<lines.length;i++){
+  const cells=split(lines[i]);
+  const r={};
+  for(const k in indexes)r[k]=cells[indexes[k]]??"";
+  const o={date:r.date,symbol:r.symbol.trim().toUpperCase(),open:number(r.open),high:number(r.high),low:number(r.low),close:number(r.close),volume:number(r.volume)};
+  if(!o.date||!o.symbol||![o.open,o.high,o.low,o.close,o.volume].every(Number.isFinite))continue;
+  if(o.high<o.low||o.close<0||o.volume<0)continue;
+  result.push(o);
+ }
+ if(!result.length)throw Error("Aucune ligne valide. Vérifie les dates, les chiffres et les colonnes.");
+ return result;
+}
+function analyze(items){
+ items.sort((a,b)=>a.date.localeCompare(b.date));
+ let ad=0;
+ return items.map((r,i)=>{
+  const range=r.high-r.low;
+  const multiplier=range===0?0:((r.close-r.low)-(r.high-r.close))/range;
+  const moneyFlow=multiplier*r.volume;
+  ad+=moneyFlow;
+  const previous=items[i-1];
+  return {...r,multiplier,moneyFlow,ad,change:previous&&previous.close!==0?(r.close-previous.close)/previous.close*100:null};
+ });
+}
+function fmt(n,d=2){return Number.isFinite(n)?n.toLocaleString("fr-FR",{maximumFractionDigits:d}):"—"}
+function signed(n){return n>0?"+":""}
+function render(){
+ const symbol=$("symbol").value;
+ const all=marketData.filter(r=>r.symbol===symbol);
+ if(!all.length)return;
+ const last=all[all.length-1],prev=all.length>1?all[all.length-2]:null;
+ $("price").textContent=fmt(last.close);
+ $("priceDate").textContent=last.date;
+ $("change").textContent=last.change===null?"—":signed(last.change)+fmt(last.change)+" %";
+ $("change").className=last.change>0?"green":last.change<0?"red":"";
+ $("ad").textContent=fmt(last.ad,0);
+ const windowData=all.slice(-20);
+ const totalVolume=windowData.reduce((s,r)=>s+r.volume,0);
+ const cmf=totalVolume?windowData.reduce((s,r)=>s+r.moneyFlow,0)/totalVolume:null;
+ $("cmf").textContent=cmf===null?"—":signed(cmf)+fmt(cmf,3);
+ $("cmf").className=cmf>0?"green":cmf<0?"red":"";
+ let flow="Historique insuffisant pour une interprétation fiable.";
+ if(cmf!==null){
+  if(cmf>0.05)flow="CMF positif : pression acheteuse potentielle sur la période. Confirme avec le prix et la liquidité.";
+  else if(cmf< -0.05)flow="CMF négatif : pression vendeuse potentielle sur la période. Surveille les supports et le volume.";
+  else flow="CMF proche de zéro : flux relativement équilibrés ou signal peu marqué.";
+ }
+ $("flow").textContent=flow;
+ $("flowbar").style.width=fmt(Math.min(100,Math.abs(cmf||0)*500))+"%";
+ $("flowbar").style.background=cmf<0?"var(--red)":"var(--green)";
+ let decision="Signal insuffisant : attends davantage de données et vérifie le contexte du marché.";
+ if(all.length>=2&&cmf!==null){
+  if(last.close>prev.close&&cmf>0.05)decision="Prix en hausse et CMF positif : configuration potentiellement constructive, à confirmer.";
+  else if(last.close<prev.close&&cmf< -0.05)decision="Prix en baisse et CMF négatif : faiblesse potentielle, examine le risque.";
+  else decision="Signaux mixtes : évite de conclure à partir d'un seul indicateur.";
+ }
+ $("decision").textContent=decision;
+ $("count").textContent=all.length+" séance(s) analysée(s) · "+symbol;
+ $("rows").innerHTML=all.slice().reverse().slice(0,100).map(r=>`<tr><td>${escapeHTML(r.date)}</td><td>${fmt(r.close)}</td><td class="${r.change>0?"green":r.change<0?"red":""}">${r.change===null?"—":signed(r.change)+fmt(r.change)+" %"}</td><td>${fmt(r.volume,0)}</td><td class="${r.moneyFlow>0?"green":r.moneyFlow<0?"red":""}">${r.moneyFlow>0?"Positif":r.moneyFlow<0?"Négatif":"Neutre"}</td></tr>`).join("");
+}
+function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+$("csv").addEventListener("change",async e=>{
+ const file=e.target.files[0];if(!file)return;
+ try{
+  const raw=parseCSV(await file.text());
+  const groups={};
+  raw.forEach(r=>(groups[r.symbol]??=[]).push(r));
+  marketData=Object.values(groups).flatMap(analyze);
+  const symbols=[...new Set(marketData.map(r=>r.symbol))].sort();
+  $("symbol").innerHTML=symbols.map(s=>`<option value="${escapeHTML(s)}">${escapeHTML(s)}</option>`).join("");
+  $("symbol").disabled=false;
+  $("status").textContent=raw.length+" ligne(s) importée(s) depuis "+file.name+". Vérifie que les cours et volumes correspondent bien à la BRVM.";
+  render();
+ }catch(err){$("status").textContent="Erreur : "+err.message}
+});
+$("symbol").addEventListener("change",render);
+$("reset").addEventListener("click",()=>{
+ marketData=[];$("csv").value="";$("symbol").innerHTML="<option>Aucune donnée importée</option>";$("symbol").disabled=true;
+ ["price","priceDate","change","ad","cmf"].forEach(id=>$(id).textContent="—");
+ $("flow").textContent="Importe des données pour commencer l'analyse.";
+ $("decision").textContent="Aucun signal disponible.";
+ $("count").textContent="0 séance analysée";
+ $("rows").innerHTML='<tr><td colspan="5">Aucune donnée disponible.</td></tr>';
+ $("status").textContent="Données effacées.";
+});
+</script>
+</body>
+      </html>
+    
